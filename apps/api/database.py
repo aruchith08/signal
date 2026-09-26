@@ -43,16 +43,22 @@ if is_serverless and ("sqlite" in db_url):
 
 # Create async engine
 connect_args = {}
+engine_kwargs = {"echo": settings.DATABASE_ECHO, "future": True}
+
 if db_url.startswith("sqlite"):
     connect_args["check_same_thread"] = False
     connect_args["timeout"] = 30
+else:
+    # Supabase / PgBouncer transaction mode pooler (port 6543) requires statement_cache_size=0
+    connect_args["statement_cache_size"] = 0
+    if "localhost" not in db_url and "127.0.0.1" not in db_url:
+        connect_args["ssl"] = "require"
+    if is_serverless:
+        from sqlalchemy.pool import NullPool
+        engine_kwargs["poolclass"] = NullPool
 
-engine = create_async_engine(
-    db_url,
-    echo=settings.DATABASE_ECHO,
-    future=True,
-    connect_args=connect_args,
-)
+engine_kwargs["connect_args"] = connect_args
+engine = create_async_engine(db_url, **engine_kwargs)
 
 if db_url.startswith("sqlite"):
     @event.listens_for(engine.sync_engine, "connect")
@@ -93,7 +99,12 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db() -> None:
     """Create all tables in the database (useful for dev and testing)."""
-    async with engine.begin() as conn:
-        # Import models so they are registered with Base metadata
-        import apps.api.models  # noqa: F401
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            # Import models so they are registered with Base metadata
+            import apps.api.models  # noqa: F401
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as exc:
+        import logging
+        logging.getLogger("signal").error(f"init_db caught schema creation error: {exc}")
+
