@@ -38,6 +38,11 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["apps*", "services*", "connectors*", "shared*", "api*"]
+exclude = ["docker*", "migrations*", "tests*", "alembic*", "dist_test*"]
+
 [tool.black]
 line-length = 100
 target-version = ['py311']
