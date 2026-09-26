@@ -66,23 +66,35 @@ if (web_dist / "assets").exists():
     app.mount("/assets", StaticFiles(directory=str(web_dist / "assets")), name="web_assets")
 
 
-@app.middleware("http")
-async def vercel_path_rewrite_middleware(request: Request, call_next):
-    """
-    Ensure requests rewritten by Vercel serverless functions are mapped back to their intended FastAPI route.
-    """
-    path = request.scope.get("path", "")
-    if path in ("/api/index.py", "/api/index", "/api"):
-        forwarded = (
-            request.headers.get("x-forwarded-uri")
-            or request.headers.get("x-matched-path")
-            or request.headers.get("x-invoke-path")
-        )
-        if forwarded and not forwarded.startswith("/api/index"):
-            request.scope["path"] = forwarded.split("?")[0]
-        elif "__path" in request.query_params:
-            request.scope["path"] = "/" + request.query_params["__path"].lstrip("/")
-    return await call_next(request)
+class VercelPathRewriteMiddleware:
+    """Pure ASGI middleware to rewrite scope path BEFORE routing occurs."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            path = scope.get("path", "")
+            if path in ("/api/index.py", "/api/index", "/api"):
+                import urllib.parse
+                qs = scope.get("query_string", b"").decode("utf-8", errors="replace")
+                params = urllib.parse.parse_qs(qs)
+                if "__path" in params and params["__path"]:
+                    scope["path"] = params["__path"][0]
+                else:
+                    headers = dict(scope.get("headers", []))
+                    forwarded = (
+                        headers.get(b"x-forwarded-uri")
+                        or headers.get(b"x-matched-path")
+                        or headers.get(b"x-invoke-path")
+                    )
+                    if forwarded:
+                        forwarded_str = forwarded.decode("utf-8", errors="replace")
+                        if not forwarded_str.startswith("/api/index"):
+                            scope["path"] = forwarded_str.split("?")[0]
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(VercelPathRewriteMiddleware)
 
 
 @app.middleware("http")
