@@ -19,7 +19,7 @@
       "destination": "/api/index.py?__path=/redoc"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!assets/|.*\\..*).*)",
       "destination": "/index.html"
     }
   ]
