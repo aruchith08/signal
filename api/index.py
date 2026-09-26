@@ -152,6 +152,17 @@ async def serve_index():
     return JSONResponse(content={"detail": "Index file not found in build output"}, status_code=404)
 
 
+@app.get("/signal-icon.svg", include_in_schema=False)
+async def serve_favicon():
+    icon_file = web_dist / "signal-icon.svg"
+    if icon_file.exists():
+        return FileResponse(str(icon_file), media_type="image/svg+xml")
+    public_icon = Path(ROOT_DIR) / "apps" / "web" / "public" / "signal-icon.svg"
+    if public_icon.exists():
+        return FileResponse(str(public_icon), media_type="image/svg+xml")
+    return Response(status_code=204)
+
+
 @app.post("/api/v1/init-db", tags=["Diagnostic"])
 @app.get("/api/v1/init-db", tags=["Diagnostic"])
 async def trigger_init_db():
