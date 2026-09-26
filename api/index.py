@@ -67,6 +67,25 @@ if (web_dist / "assets").exists():
 
 
 @app.middleware("http")
+async def vercel_path_rewrite_middleware(request: Request, call_next):
+    """
+    Ensure requests rewritten by Vercel serverless functions are mapped back to their intended FastAPI route.
+    """
+    path = request.scope.get("path", "")
+    if path in ("/api/index.py", "/api/index", "/api"):
+        forwarded = (
+            request.headers.get("x-forwarded-uri")
+            or request.headers.get("x-matched-path")
+            or request.headers.get("x-invoke-path")
+        )
+        if forwarded and not forwarded.startswith("/api/index"):
+            request.scope["path"] = forwarded.split("?")[0]
+        elif "__path" in request.query_params:
+            request.scope["path"] = "/" + request.query_params["__path"].lstrip("/")
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def startup_check_middleware(request: Request, call_next):
     """Catch any startup/import errors and return full diagnostics instead of opaque 500s."""
     if _startup_error:
