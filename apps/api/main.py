@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 
 from apps.api.config import settings
-from apps.api.database import init_db, engine
+from apps.api.database import init_db, engine, is_serverless
 from apps.api.routers import (
     health_router,
     organizations_router,
@@ -37,44 +37,41 @@ logging.basicConfig(
 )
 logger = logging.getLogger("signal")
 
-is_serverless = bool(
-    os.getenv("VERCEL")
-    or os.getenv("VERCEL_ENV")
-    or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
-    or os.getenv("LAMBDA_TASK_ROOT")
-)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifecycle hooks: initialize database and clean up resources."""
     logger.info("📡 Starting SIGNAL Opportunity Intelligence Platform...")
-    # Initialize DB tables for development/testing
     try:
-        await init_db()
-        logger.info("Database schema initialized.")
-    except Exception as exc:
-        logger.error(f"Database initialization error during startup: {exc}")
+        # Initialize DB tables for development/testing
+        try:
+            await init_db()
+            logger.info("Database schema initialized.")
+        except Exception as exc:
+            logger.error(f"Database initialization error during startup: {exc}")
 
-    # Initialize default sources (e.g. Unstop, Devfolio) idempotently
-    try:
-        from apps.api.database import AsyncSessionLocal
-        from services.sources.registry import ensure_devfolio_source, ensure_unstop_source, ensure_source
-        async with AsyncSessionLocal() as session:
-            await ensure_unstop_source(session)
-            await ensure_devfolio_source(session)
-            for slug in ["codeforces", "sih", "gsoc", "atcoder", "github-blog", "kaggle", "huggingface"]:
-                await ensure_source(slug, session)
-            await session.commit()
-        logger.info("Default opportunity sources registered.")
-    except Exception as exc:
-        logger.warning(f"Could not register default sources during startup: {exc}")
+        # Initialize default sources (e.g. Unstop, Devfolio) idempotently
+        try:
+            from apps.api.database import AsyncSessionLocal
+            from services.sources.registry import ensure_devfolio_source, ensure_unstop_source, ensure_source
+            async with AsyncSessionLocal() as session:
+                await ensure_unstop_source(session)
+                await ensure_devfolio_source(session)
+                for slug in ["codeforces", "sih", "gsoc", "atcoder", "github-blog", "kaggle", "huggingface"]:
+                    await ensure_source(slug, session)
+                await session.commit()
+            logger.info("Default opportunity sources registered.")
+        except Exception as exc:
+            logger.warning(f"Could not register default sources during startup: {exc}")
 
-    # Start scheduler after DB init if enabled and not in serverless mode
-    if settings.ENABLE_SCHEDULER and not is_serverless:
-        schedule_jobs(app)
-    else:
-        logger.info("Scheduler skipped (serverless or disabled mode).")
+        # Start scheduler after DB init if enabled and not in serverless mode
+        if settings.ENABLE_SCHEDULER and not is_serverless:
+            schedule_jobs(app)
+        else:
+            logger.info("Scheduler skipped (serverless or disabled mode).")
+    except Exception as exc:
+        logger.critical(f"FATAL error in lifespan startup: {exc}", exc_info=True)
+
     try:
         yield
     finally:
@@ -234,6 +231,26 @@ async def spa_404_handler(request: Request, exc):
         if index_html.exists():
             return FileResponse(str(index_html))
     return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+
+@app.get(f"{settings.API_V1_PREFIX}/ping", tags=["Health"])
+async def ping():
+    return {
+        "status": "pong",
+        "app": settings.APP_NAME,
+        "is_serverless": is_serverless,
+        "cwd": os.getcwd(),
+    }
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    logger.error(f"Global unhandled exception on {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "error": str(exc), "traceback": traceback.format_exc()},
+    )
 
 
 if __name__ == "__main__":

@@ -10,12 +10,22 @@ from apps.api.config import settings
 import os
 from sqlalchemy import event
 
-is_serverless = bool(
-    os.getenv("VERCEL")
-    or os.getenv("VERCEL_ENV")
-    or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
-    or os.getenv("LAMBDA_TASK_ROOT")
-)
+def check_is_serverless() -> bool:
+    if os.getenv("VERCEL") or os.getenv("VERCEL_ENV") or os.getenv("AWS_LAMBDA_FUNCTION_NAME") or os.getenv("LAMBDA_TASK_ROOT"):
+        return True
+    cwd = os.path.abspath(".").lower()
+    if "vercel" in cwd or "/var/task" in cwd or "\\var\\task" in cwd:
+        return True
+    try:
+        test_path = os.path.join(".", ".probe_rw")
+        with open(test_path, "w") as f:
+            f.write("1")
+        os.remove(test_path)
+        return False
+    except Exception:
+        return True
+
+is_serverless = check_is_serverless()
 
 # Normalize database URL
 db_url = settings.DATABASE_URL
@@ -24,9 +34,12 @@ if db_url.startswith("postgres://"):
 elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+asyncpg://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# In serverless environments (e.g. Vercel / AWS Lambda), the filesystem is read-only except /tmp
-if is_serverless and ("sqlite" in db_url) and not db_url.startswith("sqlite+aiosqlite:////tmp"):
-    db_url = "sqlite+aiosqlite:////tmp/signal_dev.db"
+import tempfile
+
+# In serverless environments (e.g. Vercel / AWS Lambda), the filesystem is read-only except tempdir
+if is_serverless and ("sqlite" in db_url):
+    temp_dir = tempfile.gettempdir().replace("\\", "/").rstrip("/")
+    db_url = f"sqlite+aiosqlite:///{temp_dir}/signal_dev.db"
 
 # Create async engine
 connect_args = {}
