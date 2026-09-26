@@ -18,7 +18,7 @@ elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+as
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 # In Vercel serverless environment, use /tmp for default SQLite persistence
-if os.getenv("VERCEL") and db_url.startswith("sqlite+aiosqlite:///."):
+if os.getenv("VERCEL") and ("sqlite" in db_url) and not db_url.startswith("sqlite+aiosqlite:////tmp"):
     db_url = "sqlite+aiosqlite:////tmp/signal_dev.db"
 
 # Create async engine
@@ -38,7 +38,10 @@ if db_url.startswith("sqlite"):
     @event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
+        if not os.getenv("VERCEL"):
+            cursor.execute("PRAGMA journal_mode=WAL")
+        else:
+            cursor.execute("PRAGMA journal_mode=MEMORY")
         cursor.execute("PRAGMA busy_timeout=30000")
         cursor.close()
 
