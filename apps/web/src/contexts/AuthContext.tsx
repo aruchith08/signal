@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error('Failed to bootstrap active user:', err);
       showToast('Backend Connection Notice', {
-        description: 'Unable to reach SIGNAL backend at localhost:8000. Ensure API is running.',
+        description: 'Unable to reach SIGNAL backend API. Ensure service is operational.',
         type: 'warning',
       });
     } finally {
