@@ -3,8 +3,6 @@ Vercel Serverless Function entrypoint for SIGNAL FastAPI backend.
 """
 import os
 import sys
-import logging
-import traceback
 
 # Ensure repository root is on sys.path so modules (apps, services, shared, connectors) resolve cleanly
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -21,25 +19,8 @@ if "DATABASE_URL" not in os.environ or "signal_dev.db" in os.environ.get("DATABA
     if not os.environ.get("DATABASE_URL", "").startswith("postgresql"):
         os.environ["DATABASE_URL"] = "sqlite+aiosqlite:////tmp/signal_dev.db"
 
-try:
-    from apps.api.main import app
-    handler = app
-except Exception as e:
-    err_trace = traceback.format_exc()
-    logging.error(f"Fatal error initializing SIGNAL on Vercel: {e}\n{err_trace}")
-    from fastapi import FastAPI
-    from fastapi.responses import JSONResponse
+# Top-level FastAPI application export recognized by Vercel AST scanner
+from apps.api.main import app
 
-    app = FastAPI(title="SIGNAL - Startup Error")
-
-    @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"])
-    async def debug_error(path: str):
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": "SIGNAL FastAPI Startup Failed on Vercel",
-                "message": str(e),
-                "traceback": err_trace,
-            },
-        )
-    handler = app
+# Secondary alias
+handler = app
