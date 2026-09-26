@@ -1,0 +1,21 @@
+{
+  "name": "signal-opportunity-intelligence",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SIGNAL 📡 — Personal Opportunity Intelligence Network for Students & Developers",
+  "scripts": {
+    "build": "cd apps/web && npm install && npm run build",
+    "web:dev": "cd apps/web && npm run dev",
+    "api:dev": "python -m uvicorn apps.api.main:app --reload --host 127.0.0.1 --port 8000"
+  },
+  "keywords": [
+    "hackathons",
+    "competitive-programming",
+    "opportunities",
+    "intelligence",
+    "fastapi",
+    "react"
+  ],
+  "author": "aruchith08",
+  "license": "MIT"
+}
