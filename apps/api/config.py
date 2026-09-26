@@ -1,8 +1,8 @@
 """
 Configuration and Environment Settings for SIGNAL API
 """
-from typing import List, Union
-from pydantic import Field, field_validator
+from typing import List, Union, Any
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +12,16 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def clean_empty_strings(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            return {
+                k: v for k, v in data.items()
+                if not (isinstance(v, str) and v.strip() == "")
+            }
+        return data
 
     # Core Application Settings
     ENVIRONMENT: str = "development"
