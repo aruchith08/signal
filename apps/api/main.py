@@ -2,10 +2,11 @@
 SIGNAL 📡 — FastAPI Application Entrypoint
 """
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 
 from apps.api.config import settings
 from apps.api.database import init_db, engine
@@ -36,14 +37,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger("signal")
 
+is_serverless = bool(
+    os.getenv("VERCEL")
+    or os.getenv("VERCEL_ENV")
+    or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+    or os.getenv("LAMBDA_TASK_ROOT")
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifecycle hooks: initialize database and clean up resources."""
     logger.info("📡 Starting SIGNAL Opportunity Intelligence Platform...")
     # Initialize DB tables for development/testing
-    await init_db()
-    logger.info("Database schema initialized.")
+    try:
+        await init_db()
+        logger.info("Database schema initialized.")
+    except Exception as exc:
+        logger.error(f"Database initialization error during startup: {exc}")
+
     # Initialize default sources (e.g. Unstop, Devfolio) idempotently
     try:
         from apps.api.database import AsyncSessionLocal
@@ -57,8 +69,9 @@ async def lifespan(app: FastAPI):
         logger.info("Default opportunity sources registered.")
     except Exception as exc:
         logger.warning(f"Could not register default sources during startup: {exc}")
-    # Start scheduler after DB init if enabled
-    if settings.ENABLE_SCHEDULER and not os.getenv("VERCEL"):
+
+    # Start scheduler after DB init if enabled and not in serverless mode
+    if settings.ENABLE_SCHEDULER and not is_serverless:
         schedule_jobs(app)
     else:
         logger.info("Scheduler skipped (serverless or disabled mode).")
@@ -69,8 +82,14 @@ async def lifespan(app: FastAPI):
         # Shutdown scheduler if running
         scheduler = getattr(app.state, "scheduler", None)
         if scheduler:
-            scheduler.shutdown(wait=False)
-        await engine.dispose()
+            try:
+                scheduler.shutdown(wait=False)
+            except Exception:
+                pass
+        try:
+            await engine.dispose()
+        except Exception:
+            pass
 
 
 app = FastAPI(
@@ -120,6 +139,21 @@ async def add_security_headers(request: Request, call_next):
 
 
 @app.middleware("http")
+async def vercel_path_rewrite(request: Request, call_next):
+    """
+    Ensure requests rewritten by Vercel serverless functions are mapped back to their intended FastAPI route.
+    """
+    path = request.scope.get("path", "")
+    if path in ("/api/index.py", "/api/index", "/api"):
+        forwarded = request.headers.get("x-forwarded-uri") or request.headers.get("x-matched-path")
+        if forwarded and not forwarded.startswith("/api/index"):
+            request.scope["path"] = forwarded.split("?")[0]
+        elif "__path" in request.query_params:
+            request.scope["path"] = "/" + request.query_params["__path"].lstrip("/")
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def limit_request_size(request: Request, call_next):
     """Reject payloads exceeding maximum content size."""
     content_length = request.headers.get("content-length")
@@ -159,23 +193,47 @@ from fastapi.staticfiles import StaticFiles
 
 # Optional Web SPA Mount (Phase 4)
 web_dist = Path(__file__).resolve().parent.parent / "web" / "dist"
+if (web_dist / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(web_dist / "assets")), name="web_assets")
 if web_dist.exists():
     app.mount("/app", StaticFiles(directory=str(web_dist), html=True), name="web_app")
 
 
+@app.get("/api/index.py", tags=["Root"])
+@app.get("/api/index", tags=["Root"])
+async def vercel_index_direct():
+    return {
+        "status": "healthy",
+        "service": "SIGNAL Opportunity Intelligence Platform",
+        "health": f"{settings.API_V1_PREFIX}/health",
+        "docs": "/docs",
+    }
+
+
 @app.get("/", tags=["Root"])
 async def root():
-    """Root metadata endpoint."""
-    resp = {
+    """Root metadata endpoint or SPA entrypoint."""
+    index_html = web_dist / "index.html"
+    if index_html.exists():
+        return FileResponse(str(index_html))
+    return {
         "platform": settings.APP_NAME,
         "tagline": "Your Personal Opportunity Intelligence Network",
         "version": settings.APP_VERSION,
         "docs_url": "/docs",
         "api_v1_prefix": settings.API_V1_PREFIX,
     }
-    if web_dist.exists():
-        resp["app_url"] = "/app"
-    return resp
+
+
+@app.exception_handler(404)
+async def spa_404_handler(request: Request, exc):
+    """Fallback non-API 404s to SPA index.html for client-side routing."""
+    path = request.url.path
+    if not (path.startswith("/api") or path.startswith("/docs") or path.startswith("/redoc") or path.startswith("/openapi")):
+        index_html = web_dist / "index.html"
+        if index_html.exists():
+            return FileResponse(str(index_html))
+    return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
 
 if __name__ == "__main__":

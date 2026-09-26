@@ -10,6 +10,13 @@ from apps.api.config import settings
 import os
 from sqlalchemy import event
 
+is_serverless = bool(
+    os.getenv("VERCEL")
+    or os.getenv("VERCEL_ENV")
+    or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+    or os.getenv("LAMBDA_TASK_ROOT")
+)
+
 # Normalize database URL
 db_url = settings.DATABASE_URL
 if db_url.startswith("postgres://"):
@@ -17,8 +24,8 @@ if db_url.startswith("postgres://"):
 elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+asyncpg://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# In Vercel serverless environment, use /tmp for default SQLite persistence
-if os.getenv("VERCEL") and ("sqlite" in db_url) and not db_url.startswith("sqlite+aiosqlite:////tmp"):
+# In serverless environments (e.g. Vercel / AWS Lambda), the filesystem is read-only except /tmp
+if is_serverless and ("sqlite" in db_url) and not db_url.startswith("sqlite+aiosqlite:////tmp"):
     db_url = "sqlite+aiosqlite:////tmp/signal_dev.db"
 
 # Create async engine
@@ -38,7 +45,7 @@ if db_url.startswith("sqlite"):
     @event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
-        if not os.getenv("VERCEL"):
+        if not is_serverless:
             cursor.execute("PRAGMA journal_mode=WAL")
         else:
             cursor.execute("PRAGMA journal_mode=MEMORY")
