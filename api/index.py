@@ -121,5 +121,33 @@ async def serve_index():
     return JSONResponse(content={"detail": "Index file not found in build output"}, status_code=404)
 
 
+@app.post("/api/v1/init-db", tags=["Diagnostic"])
+@app.get("/api/v1/init-db", tags=["Diagnostic"])
+async def trigger_init_db():
+    """Explicit endpoint to create database tables and seed sources on demand."""
+    from apps.api.database import init_db, AsyncSessionLocal
+    from services.sources.registry import ensure_devfolio_source, ensure_unstop_source, ensure_source
+    
+    results = {}
+    try:
+        await init_db()
+        results["schema"] = "initialized"
+    except Exception as exc:
+        results["schema"] = f"error: {exc}"
+        
+    try:
+        async with AsyncSessionLocal() as session:
+            await ensure_unstop_source(session)
+            await ensure_devfolio_source(session)
+            for slug in ["codeforces", "sih", "gsoc", "atcoder", "github-blog", "kaggle", "huggingface"]:
+                await ensure_source(slug, session)
+            await session.commit()
+        results["sources"] = "seeded"
+    except Exception as exc:
+        results["sources"] = f"error: {exc}"
+        
+    return {"status": "complete", "details": results}
+
+
 # Secondary alias
 handler = app

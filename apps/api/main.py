@@ -55,26 +55,29 @@ async def lifespan(app: FastAPI):
     """Application lifecycle hooks: initialize database and clean up resources."""
     logger.info("📡 Starting SIGNAL Opportunity Intelligence Platform...")
     try:
-        # Initialize DB tables for development/testing
-        try:
-            await init_db()
-            logger.info("Database schema initialized.")
-        except Exception as exc:
-            logger.error(f"Database initialization error during startup: {exc}")
+        # Initialize DB tables and seed sources for local development/testing
+        if not is_serverless:
+            try:
+                await init_db()
+                logger.info("Database schema initialized.")
+            except Exception as exc:
+                logger.error(f"Database initialization error during startup: {exc}")
 
-        # Initialize default sources (e.g. Unstop, Devfolio) idempotently
-        try:
-            from apps.api.database import AsyncSessionLocal
-            from services.sources.registry import ensure_devfolio_source, ensure_unstop_source, ensure_source
-            async with AsyncSessionLocal() as session:
-                await ensure_unstop_source(session)
-                await ensure_devfolio_source(session)
-                for slug in ["codeforces", "sih", "gsoc", "atcoder", "github-blog", "kaggle", "huggingface"]:
-                    await ensure_source(slug, session)
-                await session.commit()
-            logger.info("Default opportunity sources registered.")
-        except Exception as exc:
-            logger.warning(f"Could not register default sources during startup: {exc}")
+            # Initialize default sources (e.g. Unstop, Devfolio) idempotently
+            try:
+                from apps.api.database import AsyncSessionLocal
+                from services.sources.registry import ensure_devfolio_source, ensure_unstop_source, ensure_source
+                async with AsyncSessionLocal() as session:
+                    await ensure_unstop_source(session)
+                    await ensure_devfolio_source(session)
+                    for slug in ["codeforces", "sih", "gsoc", "atcoder", "github-blog", "kaggle", "huggingface"]:
+                        await ensure_source(slug, session)
+                    await session.commit()
+                logger.info("Default opportunity sources registered.")
+            except Exception as exc:
+                logger.warning(f"Could not register default sources during startup: {exc}")
+        else:
+            logger.info("⚡ Serverless execution detected: skipping blocking DDL schema creation and source seeding on cold start.")
 
         # Start scheduler after DB init if enabled and not in serverless mode
         if settings.ENABLE_SCHEDULER and not is_serverless:
