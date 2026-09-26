@@ -7,7 +7,7 @@ import sys
 # Ensure repository root and current directories are on sys.path
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(CURRENT_DIR)
-for p in [ROOT_DIR, CURRENT_DIR, os.getcwd()]:
+for p in [ROOT_DIR, CURRENT_DIR, os.getcwd(), "/var/task"]:
     if p and p not in sys.path:
         sys.path.insert(0, p)
 

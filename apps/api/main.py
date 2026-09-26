@@ -3,7 +3,19 @@ SIGNAL 📡 — FastAPI Application Entrypoint
 """
 import logging
 import os
+import sys
 from contextlib import asynccontextmanager
+
+# Bootstrap sys.path so modules (apps, services, shared, connectors) resolve in serverless runtimes
+_current_file = os.path.abspath(__file__)
+_apps_api_dir = os.path.dirname(_current_file)
+_apps_dir = os.path.dirname(_apps_api_dir)
+_repo_root = os.path.dirname(_apps_dir)
+
+for _p in [_repo_root, _apps_dir, os.getcwd(), "/var/task"]:
+    if _p and os.path.exists(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
