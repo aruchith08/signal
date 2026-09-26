@@ -1,7 +1,7 @@
 """
 Configuration and Environment Settings for SIGNAL API
 """
-from typing import List
+from typing import List, Union
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
         return self.JWT_SECRET_KEY or self.SECRET_KEY
 
     # CORS
-    CORS_ORIGINS: List[str] = Field(
+    CORS_ORIGINS: Union[List[str], str] = Field(
         default=[
             "http://localhost:3000",
             "http://localhost:8000",
@@ -46,8 +46,19 @@ class Settings(BaseSettings):
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v):
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",") if i.strip()]
+        if not v:
+            return ["*"]
+        if isinstance(v, str):
+            v_str = v.strip()
+            if not v_str:
+                return ["*"]
+            if v_str.startswith("[") and v_str.endswith("]"):
+                import json
+                try:
+                    return json.loads(v_str)
+                except Exception:
+                    pass
+            return [i.strip() for i in v_str.split(",") if i.strip()]
         return v
 
     # Scheduler
