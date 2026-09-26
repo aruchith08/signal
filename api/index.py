@@ -20,26 +20,12 @@ if "DATABASE_URL" not in os.environ or "signal_dev.db" in os.environ.get("DATABA
     if not os.environ.get("DATABASE_URL", "").startswith("postgresql"):
         os.environ["DATABASE_URL"] = "sqlite+aiosqlite:////tmp/signal_dev.db"
 
-# Top-level FastAPI application export recognized by Vercel AST scanner
-try:
-    from apps.api.main import app
-    handler = app
-except Exception as exc:
-    import traceback
-    err_tb = traceback.format_exc()
-    from fastapi import FastAPI
-    from fastapi.responses import JSONResponse
-    app = FastAPI(title="SIGNAL Fallback Error Handler")
-    @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"])
-    async def report_startup_error(full_path: str = ""):
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": "FastAPI App Import Failed on Vercel",
-                "message": str(exc),
-                "traceback": err_tb,
-                "sys_path": sys.path,
-                "cwd": os.getcwd(),
-            }
-        )
-    handler = app
+from fastapi import FastAPI
+from apps.api.main import app as main_app
+
+# Top-level FastAPI application instance explicitly recognized by Vercel AST scanner
+app = FastAPI(title="SIGNAL Vercel Gateway", docs_url=None, redoc_url=None, openapi_url=None)
+app.mount("/", main_app)
+
+# Secondary alias
+handler = app

@@ -43,8 +43,6 @@ where = ["."]
 include = ["apps*", "services*", "connectors*", "shared*", "api*"]
 exclude = ["docker*", "migrations*", "tests*", "alembic*", "dist_test*"]
 
-[tool.vercel]
-entrypoint = "apps.api.main:app"
 
 [tool.black]
 line-length = 100
