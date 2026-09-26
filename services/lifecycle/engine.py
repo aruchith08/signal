@@ -5,7 +5,7 @@ authoritative event history, and strict event idempotency.
 """
 from datetime import datetime, timezone
 import logging
-from typing import Optional
+from typing import Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
