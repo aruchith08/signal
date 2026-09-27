@@ -112,7 +112,9 @@ export const Sidebar: React.FC = () => {
           <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400 font-mono">
             <span>Threshold:</span>
             <span className="text-emerald-400 font-semibold">
-              {user ? Math.round(user.relevance_threshold * 100) : 50}%
+              {user && typeof user.relevance_threshold === 'number' && !isNaN(user.relevance_threshold)
+                ? Math.round(user.relevance_threshold * 100)
+                : 70}%
             </span>
           </div>
         </div>

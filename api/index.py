@@ -188,7 +188,29 @@ async def trigger_init_db():
     except Exception as exc:
         results["sources"] = f"error: {exc}"
         
+    try:
+        from services.sources.seed import seed_opportunities_data
+        async with AsyncSessionLocal() as session:
+            seed_res = await seed_opportunities_data(session)
+        results["opportunities"] = seed_res
+    except Exception as exc:
+        results["opportunities"] = f"error: {exc}"
+        
     return {"status": "complete", "details": results}
+
+
+@app.post("/api/v1/seed", tags=["Diagnostic"])
+@app.get("/api/v1/seed", tags=["Diagnostic"])
+async def trigger_seed():
+    """Seed rich student opportunities across categories with deadline events."""
+    from apps.api.database import AsyncSessionLocal
+    from services.sources.seed import seed_opportunities_data
+    try:
+        async with AsyncSessionLocal() as session:
+            res = await seed_opportunities_data(session)
+        return {"status": "success", "result": res}
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
 
 
 # Secondary alias

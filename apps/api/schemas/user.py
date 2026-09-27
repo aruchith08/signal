@@ -3,7 +3,7 @@ Pydantic Schemas for User, UserProfile, and UserInterest
 """
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class UserProfileBase(BaseModel):
@@ -101,3 +101,23 @@ class UserRead(UserBase):
     interests: List[UserInterestRead] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def name(self) -> str:
+        return self.full_name or self.username
+
+    @computed_field
+    @property
+    def education_level(self) -> Optional[str]:
+        return self.profile.education_level if self.profile else None
+
+    @computed_field
+    @property
+    def graduation_year(self) -> Optional[int]:
+        return self.profile.graduation_year if self.profile else None
+
+    @computed_field
+    @property
+    def relevance_threshold(self) -> float:
+        return 0.70

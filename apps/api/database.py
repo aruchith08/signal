@@ -104,6 +104,17 @@ async def init_db() -> None:
             # Import models so they are registered with Base metadata
             import apps.api.models  # noqa: F401
             await conn.run_sync(Base.metadata.create_all)
+            if engine.dialect.name == "postgresql":
+                from sqlalchemy import text
+                for stmt in [
+                    "ALTER TABLE opportunities ALTER COLUMN last_verified_at TYPE TIMESTAMP WITH TIME ZONE;",
+                    "ALTER TABLE semantic_match_candidates ALTER COLUMN resolved_at TYPE TIMESTAMP WITH TIME ZONE;",
+                    "ALTER TABLE verification_reviews ALTER COLUMN resolved_at TYPE TIMESTAMP WITH TIME ZONE;",
+                ]:
+                    try:
+                        await conn.execute(text(stmt))
+                    except Exception:
+                        pass
     except Exception as exc:
         import logging
         logging.getLogger("signal").error(f"init_db caught schema creation error: {exc}")

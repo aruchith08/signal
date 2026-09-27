@@ -67,7 +67,7 @@ class Opportunity(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     verification_confidence: Mapped[float] = mapped_column(Float, default=0.50, nullable=False)
     source_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     official_source_present: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    last_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     organization: Mapped[Optional["Organization"]] = relationship(

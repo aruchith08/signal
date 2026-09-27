@@ -116,7 +116,7 @@ export const DashboardPage: React.FC = () => {
               Tracked Opportunities
             </span>
             <div className="text-2xl font-bold font-mono text-slate-100 mt-1">
-              {stats.total_tracked}
+              {stats?.total_tracked ?? (stats as any)?.opportunities_tracked ?? 0}
             </div>
           </div>
           <div className="p-2.5 rounded-lg bg-slate-800/80 text-emerald-400 border border-slate-700/60">
@@ -130,7 +130,7 @@ export const DashboardPage: React.FC = () => {
               Active Phases
             </span>
             <div className="text-2xl font-bold font-mono text-sky-400 mt-1">
-              {stats.active_events}
+              {stats?.active_events ?? 0}
             </div>
           </div>
           <div className="p-2.5 rounded-lg bg-slate-800/80 text-sky-400 border border-slate-700/60">
@@ -144,7 +144,7 @@ export const DashboardPage: React.FC = () => {
               Verified Sources
             </span>
             <div className="text-2xl font-bold font-mono text-emerald-400 mt-1">
-              {stats.verified_sources}
+              {stats?.verified_sources ?? (stats as any)?.sources_total ?? 0}
             </div>
           </div>
           <div className="p-2.5 rounded-lg bg-slate-800/80 text-emerald-400 border border-slate-700/60">
@@ -158,7 +158,7 @@ export const DashboardPage: React.FC = () => {
               Approaching Deadlines
             </span>
             <div className="text-2xl font-bold font-mono text-amber-400 mt-1">
-              {stats.critical_deadlines}
+              {stats?.critical_deadlines ?? 0}
             </div>
           </div>
           <div className="p-2.5 rounded-lg bg-slate-800/80 text-amber-400 border border-slate-700/60">

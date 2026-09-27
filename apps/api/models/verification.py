@@ -120,7 +120,7 @@ class SemanticMatchCandidate(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         String(50), default=CandidateStatus.PENDING.value, nullable=False, index=True
     )
     decision_reason: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     opportunity_a: Mapped["Opportunity"] = relationship(
@@ -157,7 +157,7 @@ class VerificationReview(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     review_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     resolution_action: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     candidate: Mapped[Optional["SemanticMatchCandidate"]] = relationship("SemanticMatchCandidate")

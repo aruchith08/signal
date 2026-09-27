@@ -97,7 +97,7 @@ async def get_dashboard_overview(
 
     # 1. Load active user if requested or find default
     user = None
-    if user_id:
+    if user_id and isinstance(user_id, str):
         u_stmt = (
             select(User)
             .options(
@@ -143,12 +143,33 @@ async def get_dashboard_overview(
         )
     ).scalar() or 0
 
+    active_events = (
+        await db.execute(
+            select(func.count(OpportunityEvent.id)).where(
+                (OpportunityEvent.deadline_date == None) | (OpportunityEvent.deadline_date >= now_utc - timedelta(days=1))
+            )
+        )
+    ).scalar() or 0
+    critical_deadlines = (
+        await db.execute(
+            select(func.count(OpportunityEvent.id)).where(
+                OpportunityEvent.deadline_date != None,
+                OpportunityEvent.deadline_date >= now_utc - timedelta(days=1),
+                OpportunityEvent.deadline_date <= now_utc + timedelta(days=14),
+            )
+        )
+    ).scalar() or 0
+
     stats = {
         "opportunities_tracked": total_opps,
         "sources_online": healthy_sources,
         "sources_total": total_sources,
         "verified_opportunities": verified_opps,
         "pending_reviews": pending_reviews,
+        "total_tracked": total_opps,
+        "active_events": active_events,
+        "verified_sources": total_sources,
+        "critical_deadlines": critical_deadlines,
     }
 
     # 3. Deadlines Approaching (Events with deadline_date in future)
