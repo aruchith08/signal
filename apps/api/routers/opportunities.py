@@ -23,12 +23,18 @@ router = APIRouter(prefix="/opportunities", tags=["Opportunities"])
 
 
 
+import time
+
+_OPPORTUNITIES_CACHE: dict = {}
+_OPPORTUNITIES_CACHE_TTL = 30  # 30 seconds cache
+
+
 @router.get("", response_model=PaginatedResponse[OpportunityRead])
 async def list_opportunities(
     db: AsyncSession = Depends(get_db),
-    category: Optional[OpportunityCategory] = Query(None, description="Filter by opportunity category"),
-    status_filter: Optional[OpportunityStatus] = Query(None, alias="status", description="Filter by status"),
-    verification_status: Optional[VerificationStatus] = Query(None, description="Filter by verification tier"),
+    category: Optional[str] = Query(None, description="Filter by opportunity category"),
+    status_filter: Optional[str] = Query(None, alias="status", description="Filter by status"),
+    verification_status: Optional[str] = Query(None, description="Filter by verification tier"),
     official: Optional[bool] = Query(None, description="Filter by official publisher status"),
     current_state: Optional[str] = Query(None, description="Filter by current lifecycle state"),
     year: Optional[int] = Query(None, description="Filter by opportunity year"),
@@ -39,14 +45,24 @@ async def list_opportunities(
     offset: Optional[int] = Query(None, ge=0, description="Alternative offset"),
 ):
     """List opportunities with rich multi-criteria filtering, search, and dual pagination (page/page_size or limit/offset)."""
+    cache_key = f"{category}:{status_filter}:{verification_status}:{official}:{current_state}:{year}:{search}:{page}:{page_size}:{limit}:{offset}"
+    now_ts = time.time()
+    if cache_key in _OPPORTUNITIES_CACHE:
+        cached_time, cached_val = _OPPORTUNITIES_CACHE[cache_key]
+        if now_ts - cached_time < _OPPORTUNITIES_CACHE_TTL:
+            return cached_val
+
     query = select(Opportunity)
 
-    if category:
-        query = query.where(Opportunity.category == category.value)
-    if status_filter:
-        query = query.where(Opportunity.status == status_filter.value)
-    if verification_status:
-        query = query.where(Opportunity.verification_status == verification_status.value)
+    if category and category.strip():
+        cat_lower = category.strip().lower()
+        query = query.where(func.lower(Opportunity.category) == cat_lower)
+    if status_filter and status_filter.strip():
+        stat_lower = status_filter.strip().lower()
+        query = query.where(func.lower(Opportunity.status) == stat_lower)
+    if verification_status and verification_status.strip():
+        vstat_lower = verification_status.strip().lower()
+        query = query.where(func.lower(Opportunity.verification_status) == vstat_lower)
     if official is not None:
         query = query.where(Opportunity.official == official)
     if current_state:
@@ -70,13 +86,15 @@ async def list_opportunities(
     query = query.order_by(Opportunity.created_at.desc()).offset(effective_offset).limit(effective_limit)
     items = (await db.execute(query)).scalars().all()
 
-    return PaginatedResponse(
+    result = PaginatedResponse(
         items=items,
         total=total,
         page=effective_page,
         page_size=effective_limit,
         pages=math.ceil(total / effective_limit) if total > 0 else 1,
     )
+    _OPPORTUNITIES_CACHE[cache_key] = (now_ts, result)
+    return result
 
 
 @router.post("", response_model=OpportunityDetailRead, status_code=status.HTTP_201_CREATED)

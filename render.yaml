@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: signal-api
+    runtime: python
+    region: singapore
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn apps.api.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DATABASE_URL
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+      - key: CORS_ORIGINS
+        value: '["https://signal-blush-seven.vercel.app","http://localhost:5173","http://localhost:3000"]'
+      - key: AI_PRIMARY_PROVIDER
+        value: mock
+      - key: ENABLE_SCHEDULER
+        value: "true"

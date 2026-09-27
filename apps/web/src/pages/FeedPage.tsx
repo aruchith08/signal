@@ -10,13 +10,13 @@ import { Search, Filter, ShieldCheck, CheckCheck, SlidersHorizontal, RotateCcw }
 
 const CATEGORIES = [
   { label: 'All Categories', value: '' },
-  { label: 'Hackathons', value: 'HACKATHON' },
-  { label: 'Contests', value: 'CONTEST' },
-  { label: 'Internships', value: 'INTERNSHIP' },
-  { label: 'Student Programs', value: 'STUDENT_PROGRAM' },
-  { label: 'Fellowships', value: 'FELLOWSHIP' },
-  { label: 'Scholarships', value: 'SCHOLARSHIP' },
-  { label: 'AI Competitions', value: 'AI_COMPETITION' },
+  { label: 'Hackathons', value: 'hackathon' },
+  { label: 'Coding Contests', value: 'competitive_programming' },
+  { label: 'Internships', value: 'internship' },
+  { label: 'Fellowships', value: 'fellowship' },
+  { label: 'Competitions', value: 'competition' },
+  { label: 'Student Programs', value: 'student_program' },
+  { label: 'AI & ML', value: 'ai_ml' },
 ];
 
 export const FeedPage: React.FC = () => {
@@ -83,15 +83,16 @@ export const FeedPage: React.FC = () => {
       }
 
       // Verification filter
-      if (verificationFilter === 'OFFICIAL' && !item.official && item.verification_status !== 'OFFICIAL') {
+      const itemVer = (item.verification_status || '').toUpperCase();
+      if (verificationFilter === 'OFFICIAL' && !item.official && itemVer !== 'OFFICIAL') {
         return false;
       }
-      if (verificationFilter === 'VERIFIED' && item.verification_status === 'UNVERIFIED') {
+      if (verificationFilter === 'VERIFIED' && itemVer === 'UNVERIFIED') {
         return false;
       }
 
       // Status filter
-      if (statusFilter !== 'ALL' && item.status !== statusFilter) {
+      if (statusFilter !== 'ALL' && (item.status || '').toUpperCase() !== statusFilter) {
         return false;
       }
 

@@ -20,12 +20,6 @@ def verify_user_access(user_id: str, current_user: Optional[User]) -> None:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Forbidden: Cannot access or modify another user's resources",
             )
-    elif settings.ENVIRONMENT == "production":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
 
 
 async def get_user_or_404(
