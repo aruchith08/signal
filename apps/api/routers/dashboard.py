@@ -28,8 +28,12 @@ from apps.api.schemas.event import EventRead
 from apps.api.schemas.opportunity import OpportunityRead
 from services.personalization.relevance_engine import PersonalizationEngine
 from shared.constants import SourceHealthStatus
+import time
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+
+_DASHBOARD_CACHE: Dict[str, Any] = {}
+_DASHBOARD_CACHE_TTL = 30  # 30 seconds cache for instant response
 
 
 class DashboardSourcesSummary(BaseModel):
@@ -93,6 +97,13 @@ async def get_dashboard_overview(
     - recent_updates: Chronological stream of lifecycle updates
     - stats: High-level network metrics
     """
+    cache_key = str(user_id) if (user_id and isinstance(user_id, str)) else "default"
+    now_ts = time.time()
+    if cache_key in _DASHBOARD_CACHE:
+        cached_ts, cached_resp = _DASHBOARD_CACHE[cache_key]
+        if now_ts - cached_ts < _DASHBOARD_CACHE_TTL:
+            return cached_resp
+
     now_utc = datetime.now(timezone.utc)
 
     # 1. Load active user if requested or find default
@@ -294,7 +305,7 @@ async def get_dashboard_overview(
     activity_items = await get_dashboard_activity(limit=8, db=db)
     recent_updates = [a.model_dump() for a in activity_items]
 
-    return DashboardOverviewResponse(
+    resp = DashboardOverviewResponse(
         top_priority=top_priority,
         for_you=for_you,
         recent_announcements=recent_announcements,
@@ -302,6 +313,8 @@ async def get_dashboard_overview(
         recent_updates=recent_updates,
         stats=stats,
     )
+    _DASHBOARD_CACHE[cache_key] = (now_ts, resp)
+    return resp
 
 
 @router.get("/sources", response_model=DashboardSourcesSummary)
