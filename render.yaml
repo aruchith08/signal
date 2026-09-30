@@ -4,17 +4,23 @@ services:
     runtime: python
     region: singapore
     plan: free
-    buildCommand: "pip install -r requirements.txt"
+    buildCommand: "pip install -r requirements-lock.txt"
     startCommand: "uvicorn apps.api.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
       - key: DATABASE_URL
         sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
       - key: ENVIRONMENT
         value: production
+      - key: DEBUG
+        value: "False"
       - key: CORS_ORIGINS
-        value: '["https://signal-blush-seven.vercel.app","http://localhost:5173","http://localhost:3000"]'
+        sync: false
       - key: AI_PRIMARY_PROVIDER
         value: mock
       - key: ENABLE_SCHEDULER
