@@ -207,7 +207,9 @@ export const DashboardPage: React.FC = () => {
                 <span className="text-xs font-mono text-emerald-400 font-semibold">
                   Why Priority:
                 </span>
-                <span className="text-xs text-slate-300">{top_priority.reason}</span>
+                <span className="text-xs text-slate-300">
+                  {top_priority.reason || top_priority.why_it_matters || 'High-relevance opportunity with approaching milestone.'}
+                </span>
               </div>
             </div>
 
@@ -217,13 +219,15 @@ export const DashboardPage: React.FC = () => {
                   Target Milestone
                 </span>
                 <div className="text-sm font-semibold text-slate-200">
-                  {top_priority.top_event?.event_name || 'Registration Deadline'}
+                  {top_priority.top_event?.event_name || top_priority.event?.event_name || top_priority.urgency_label || 'Registration Deadline'}
                 </div>
-                {top_priority.top_event?.deadline_date && (
+                {(top_priority.top_event?.deadline_date || top_priority.event?.deadline_date) && (
                   <div className="text-xs font-mono text-amber-400 flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5" />
                     Deadline:{' '}
-                    {new Date(top_priority.top_event.deadline_date).toLocaleDateString()}
+                    {new Date(
+                      (top_priority.top_event?.deadline_date || top_priority.event?.deadline_date)!
+                    ).toLocaleDateString()}
                   </div>
                 )}
               </div>
@@ -267,21 +271,25 @@ export const DashboardPage: React.FC = () => {
               onClick={() => navigate('/feed')}
               className="text-xs text-slate-400 hover:text-emerald-400 transition-colors"
             >
-              View all ({stats.total_tracked}) →
+              View all ({stats?.total_tracked ?? 0}) →
             </button>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            {for_you.map((item) => (
-              <OpportunityCard
-                key={item.opportunity.id}
-                opportunity={item.opportunity}
-                matchScore={item.score}
-                isEligible={item.is_eligible}
-                matchTier={item.tier}
-                matchedSkills={item.matched_skills}
-              />
-            ))}
+            {for_you.map((item, idx) => {
+              const opp = item.opportunity;
+              if (!opp) return null;
+              return (
+                <OpportunityCard
+                  key={opp.id || idx}
+                  opportunity={opp}
+                  matchScore={item.score ?? item.relevance_score ?? 75}
+                  isEligible={item.is_eligible ?? (item.eligibility === 'ELIGIBLE')}
+                  matchTier={item.tier ?? 'HIGH'}
+                  matchedSkills={item.matched_skills ?? item.match_factors ?? []}
+                />
+              );
+            })}
           </div>
         </div>
 
@@ -306,18 +314,27 @@ export const DashboardPage: React.FC = () => {
               </div>
             ) : (
               deadlines_approaching.map((item, idx) => {
-                const days = item.days_remaining;
-                const isUrgent = days <= 3;
+                const oppId = item.opportunity?.id || item.opportunity_id;
+                const oppTitle = item.opportunity?.title || item.opportunity_title || 'Opportunity';
+                const deadlineDate = item.event?.deadline_date || item.deadline_date;
+                const eventName = item.event?.event_name || item.organization_name || item.urgency_label || 'Application Deadline';
+
+                let days = item.days_remaining;
+                if (days === undefined && deadlineDate) {
+                  const diff = new Date(deadlineDate).getTime() - Date.now();
+                  days = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+                }
+                const isUrgent = item.is_critical || (days !== undefined && days <= 3);
 
                 return (
                   <div
                     key={idx}
-                    onClick={() => navigate(`/opportunities/${item.opportunity.id}`)}
+                    onClick={() => oppId && navigate(`/opportunities/${oppId}`)}
                     className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:border-slate-700 hover:bg-[#131D33] transition-all cursor-pointer space-y-2 group"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <h4 className="text-xs font-semibold text-slate-200 group-hover:text-emerald-400 transition-colors line-clamp-1">
-                        {item.opportunity.title}
+                        {oppTitle}
                       </h4>
                       <span
                         className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded shrink-0 ${
@@ -326,15 +343,15 @@ export const DashboardPage: React.FC = () => {
                             : 'bg-amber-950/80 text-amber-300 border border-amber-800/60'
                         }`}
                       >
-                        {days === 0 ? 'Today' : `${days}d left`}
+                        {days === 0 ? 'Today' : days !== undefined ? `${days}d left` : (item.urgency_label || 'Soon')}
                       </span>
                     </div>
 
                     <div className="text-[11px] text-slate-400 flex items-center justify-between font-mono">
-                      <span>{item.event.event_name}</span>
+                      <span>{eventName}</span>
                       <span className="text-slate-500">
-                        {item.event.deadline_date
-                          ? new Date(item.event.deadline_date).toLocaleDateString()
+                        {deadlineDate
+                          ? new Date(deadlineDate).toLocaleDateString()
                           : ''}
                       </span>
                     </div>
