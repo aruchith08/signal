@@ -112,5 +112,21 @@ class Settings(BaseSettings):
     # Ingestion Settings
     INGESTION_DEFAULT_INTERVAL: int = 300
 
+    @model_validator(mode="after")
+    def validate_production_secrets(self):
+        """Fail startup if production is using default or missing secrets."""
+        _default_secret = "signal-super-secret-key-production-change-me-32bytes"
+        if self.ENVIRONMENT == "production":
+            effective_secret = self.JWT_SECRET_KEY or self.SECRET_KEY
+            if not effective_secret or len(effective_secret) < 32:
+                raise ValueError(
+                    "JWT_SECRET_KEY (or SECRET_KEY) must be set and at least 32 characters in production"
+                )
+            if effective_secret == _default_secret:
+                raise ValueError(
+                    "Default secret key detected in production. Set a unique JWT_SECRET_KEY."
+                )
+        return self
+
 
 settings = Settings()

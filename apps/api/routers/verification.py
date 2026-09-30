@@ -34,14 +34,15 @@ router = APIRouter(prefix="", tags=["Verification & Cross-Source Intelligence"])
 
 
 def verify_reviewer_access(current_user: Optional[User]) -> None:
-    """Enforce reviewer or admin role authorization."""
+    """Enforce reviewer or admin role authorization in all environments."""
     if current_user is not None:
         if not (current_user.is_superuser or current_user.role in ["reviewer", "admin"]):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Forbidden: Reviewer or admin role required",
             )
-    elif settings.ENVIRONMENT == "production":
+    elif settings.ENVIRONMENT != "development":
+        # Require authentication in production, staging, and preview environments
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",

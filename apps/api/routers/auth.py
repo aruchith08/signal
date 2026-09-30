@@ -48,9 +48,9 @@ async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
         username=payload.username,
         full_name=payload.full_name,
         hashed_password=pw_hash,
-        role=payload.role,
+        role="user",
         is_active=True,
-        is_superuser=(payload.role == "admin"),
+        is_superuser=False,
     )
     db.add(user)
     await db.flush()

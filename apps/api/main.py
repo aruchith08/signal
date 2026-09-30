@@ -125,14 +125,17 @@ app = FastAPI(
 )
 
 # CORS Middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+_cors_kwargs = {
+    "allow_origins": settings.CORS_ORIGINS,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+# Only allow broad Vercel preview origins in non-production environments
+if settings.ENVIRONMENT != "production":
+    _cors_kwargs["allow_origin_regex"] = r"^https:\/\/.*\.vercel\.app$"
+
+app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
 MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB payload limit
 
@@ -262,10 +265,11 @@ async def ping():
 async def global_exception_handler(request: Request, exc: Exception):
     import traceback
     logger.error(f"Global unhandled exception on {request.url.path}: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal Server Error", "error": str(exc), "traceback": traceback.format_exc()},
-    )
+    content = {"detail": "Internal Server Error"}
+    if settings.ENVIRONMENT != "production":
+        content["error"] = str(exc)
+        content["traceback"] = traceback.format_exc()
+    return JSONResponse(status_code=500, content=content)
 
 
 if __name__ == "__main__":

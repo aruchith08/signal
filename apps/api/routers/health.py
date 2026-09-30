@@ -23,7 +23,9 @@ async def get_health(db: AsyncSession = Depends(get_db)):
     try:
         await db.execute(text("SELECT 1"))
     except Exception as exc:
-        db_status = f"unhealthy: {str(exc)}"
+        import logging
+        logging.getLogger("signal").error(f"Database health check failed: {exc}")
+        db_status = "unhealthy"
 
     ai_provider = settings.AI_PRIMARY_PROVIDER
     provider_inst = ai_router.get_provider(ai_provider)
@@ -63,11 +65,13 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as exc:
+        import logging
+        logging.getLogger("signal").error(f"Database readiness check failed: {exc}")
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={
                 "status": "not_ready",
-                "database": f"unreachable: {str(exc)}",
+                "database": "unreachable",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )

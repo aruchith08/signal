@@ -30,9 +30,9 @@ services:
         condition: service_healthy
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-signal_db}
-      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY:-signal-super-secret-key-production-change-me-32bytes}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
       - HOST=${HOST:-0.0.0.0}

@@ -12,9 +12,11 @@ from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from apps.api.core.auth import get_current_active_user
 from apps.api.database import get_db
 from apps.api.models.scheduled_job import ScheduledJob
 from apps.api.models.source import Source
+from apps.api.models.user import User
 from apps.api.schemas.common import PaginatedResponse
 from apps.api.schemas.scheduler import (
     PollAllTriggerResponse,
@@ -188,6 +190,7 @@ async def list_scheduled_jobs(
 async def trigger_source_poll(
     source_slug: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Trigger an on-demand poll for a registered source by slug.
@@ -229,6 +232,7 @@ async def trigger_source_poll(
 @router.post("/poll-all", response_model=PollAllTriggerResponse, status_code=status.HTTP_200_OK)
 async def trigger_poll_all_eligible_sources(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Trigger polling for all active, scheduler-enabled sources.

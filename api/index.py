@@ -24,7 +24,7 @@ if "DATABASE_URL" not in os.environ or "signal_dev.db" in os.environ.get("DATABA
         os.environ["DATABASE_URL"] = "sqlite+aiosqlite:////tmp/signal_dev.db"
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 # Attempt to load main application
@@ -99,19 +99,20 @@ app.add_middleware(VercelPathRewriteMiddleware)
 
 @app.middleware("http")
 async def startup_check_middleware(request: Request, call_next):
-    """Catch any startup/import errors and return full diagnostics instead of opaque 500s."""
+    """Catch any startup/import errors and return diagnostics (non-production only)."""
     if _startup_error:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "status": "error",
-                "phase": "STARTUP_IMPORT_FAILED",
-                "message": "FastAPI application failed to import on Vercel.",
-                "traceback": _startup_error,
-                "sys_path": sys.path,
-                "cwd": os.getcwd(),
-            },
-        )
+        content = {
+            "status": "error",
+            "phase": "STARTUP_IMPORT_FAILED",
+            "message": "FastAPI application failed to import.",
+        }
+        # Only expose diagnostic details in non-production environments
+        env = os.environ.get("ENVIRONMENT", "development")
+        if env != "production":
+            content["traceback"] = _startup_error
+            content["sys_path"] = sys.path
+            content["cwd"] = os.getcwd()
+        return JSONResponse(status_code=500, content=content)
     return await call_next(request)
 
 
@@ -164,9 +165,11 @@ async def serve_favicon():
 
 
 @app.post("/api/v1/init-db", tags=["Diagnostic"])
-@app.get("/api/v1/init-db", tags=["Diagnostic"])
 async def trigger_init_db():
-    """Explicit endpoint to create database tables and seed sources on demand."""
+    """Initialize database tables and seed sources. Blocked in production."""
+    env = os.environ.get("ENVIRONMENT", "development")
+    if env == "production":
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
     from apps.api.database import init_db, AsyncSessionLocal
     from services.sources.registry import ensure_devfolio_source, ensure_unstop_source, ensure_source
     
@@ -200,9 +203,11 @@ async def trigger_init_db():
 
 
 @app.post("/api/v1/seed", tags=["Diagnostic"])
-@app.get("/api/v1/seed", tags=["Diagnostic"])
 async def trigger_seed():
-    """Seed rich student opportunities across categories with deadline events."""
+    """Seed rich student opportunities. Blocked in production."""
+    env = os.environ.get("ENVIRONMENT", "development")
+    if env == "production":
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
     from apps.api.database import AsyncSessionLocal
     from services.sources.seed import seed_opportunities_data
     try:
